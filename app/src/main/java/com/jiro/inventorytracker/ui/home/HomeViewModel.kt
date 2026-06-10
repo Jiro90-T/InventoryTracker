@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -31,13 +30,5 @@ class HomeViewModel @Inject constructor(
 
     fun setQuery(value: String) {
         _query.value = value
-    }
-
-    fun addPlaceholder() {
-        viewModelScope.launch {
-            repository.upsert(
-                Item(name = "New item", category = "Uncategorized")
-            )
-        }
     }
 }

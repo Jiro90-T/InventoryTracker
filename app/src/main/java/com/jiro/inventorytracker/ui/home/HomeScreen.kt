@@ -33,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    onAddClick: () -> Unit,
     onScanClick: () -> Unit,
     onItemClick: (Long) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
@@ -52,7 +53,7 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.addPlaceholder() }) {
+            FloatingActionButton(onClick = onAddClick) {
                 Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Add")
             }
         }

@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +58,12 @@ fun ScanScreen(
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
+    // Single-thread executor owned by this composable's lifecycle.
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) {
+        onDispose { cameraExecutor.shutdown() }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -74,10 +81,18 @@ fun ScanScreen(
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
-                        val previewView = PreviewView(ctx)
-                        // CameraX + ML Kit wiring to be implemented in M1.
-                        // Kept minimal here so the project compiles end-to-end.
-                        previewView
+                        PreviewView(ctx).also { previewView ->
+                            previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+                        }
+                    },
+                    update = { previewView ->
+                        CameraXSetup.bind(
+                            context = context,
+                            lifecycleOwner = lifecycleOwner,
+                            previewView = previewView,
+                            cameraExecutor = cameraExecutor,
+                            onBarcode = { code -> onBarcodeDetected(code) }
+                        )
                     }
                 )
                 Column(
