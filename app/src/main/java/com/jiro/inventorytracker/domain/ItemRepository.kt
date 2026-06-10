@@ -32,6 +32,15 @@ class ItemRepository @Inject constructor(
 
     suspend fun observeAllOnce(): List<Item> = itemDao.observeAllOnce()
     suspend fun allCategories(): List<String> = itemDao.allCategories()
+    suspend fun allReferencedPhotoPaths(): Set<String> =
+        itemDao.allReferencedPhotoPathsRaw().flatten().toSet()
 
     suspend fun delete(id: Long) = itemDao.deleteById(id)
+
+    /**
+     * Returns the photo paths attached to the item at [id] without deleting it.
+     * Callers should remove the photos from disk, then call [delete].
+     */
+    suspend fun photoPathsFor(id: Long): List<String> =
+        itemDao.getById(id)?.photoPaths.orEmpty()
 }

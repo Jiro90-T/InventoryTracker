@@ -37,10 +37,11 @@ class ReminderWorker @AssistedInject constructor(
             nm.createNotificationChannel(channel)
         }
         val notif = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(message)
             .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
         nm.notify(id.toInt(), notif)
     }

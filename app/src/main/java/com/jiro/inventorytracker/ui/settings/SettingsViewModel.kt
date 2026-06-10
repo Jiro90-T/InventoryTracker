@@ -7,6 +7,7 @@ import com.jiro.inventorytracker.export.CsvExporter
 import com.jiro.inventorytracker.persona.Persona
 import com.jiro.inventorytracker.persona.ThemeMode
 import com.jiro.inventorytracker.persona.UserPreferences
+import com.jiro.inventorytracker.reminders.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     private val repository: ItemRepository,
-    private val csvExporter: CsvExporter
+    private val csvExporter: CsvExporter,
+    private val reminderScheduler: ReminderScheduler
 ) : ViewModel() {
 
     val persona: StateFlow<Persona> = userPreferences.persona
@@ -42,5 +44,20 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             onReady(csvExporter.toCsv())
         }
+    }
+
+    /**
+     * Fires a one-off test notification in ~10 seconds so the user can confirm
+     * notification permissions are granted and the channel is configured. Uses
+     * a stable synthetic id (Long.MIN_VALUE) so it doesn't collide with real
+     * reminders.
+     */
+    fun sendTestReminderSoon() {
+        reminderScheduler.schedule(
+            itemId = -1L,
+            triggerAtMillis = System.currentTimeMillis() + 10_000L,
+            title = "Test notification",
+            message = "Reminders are working. You'll see this for warranty and expiry items."
+        )
     }
 }

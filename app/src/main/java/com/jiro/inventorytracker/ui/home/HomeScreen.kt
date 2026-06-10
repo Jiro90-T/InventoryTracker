@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jiro.inventorytracker.ui.common.EmptyState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +85,13 @@ fun HomeScreen(
                     .padding(vertical = 8.dp),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setQuery("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        }
+                    }
+                },
                 placeholder = { Text("Search items, category, location, barcode") }
             )
 
@@ -113,11 +122,15 @@ fun HomeScreen(
             }
 
             if (items.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        if (selectedCategory != null) "No items in this category."
-                        else "No items yet. Tap + to add your first item.",
-                        style = MaterialTheme.typography.bodyMedium
+                if (selectedCategory != null) {
+                    EmptyState(
+                        title = "Nothing here yet",
+                        description = "No items in this category. Tap + to add one."
+                    )
+                } else {
+                    EmptyState(
+                        title = "Your inventory is empty",
+                        description = "Tap + to add your first item, or use the scan button to add by barcode."
                     )
                 }
             } else {

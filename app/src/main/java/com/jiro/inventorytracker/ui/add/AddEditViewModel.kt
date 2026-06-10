@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jiro.inventorytracker.data.Item
 import com.jiro.inventorytracker.domain.ItemRepository
+import com.jiro.inventorytracker.media.PhotoStorage
 import com.jiro.inventorytracker.persona.Persona
 import com.jiro.inventorytracker.persona.UserPreferences
 import com.jiro.inventorytracker.reminders.ReminderScheduler
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -26,6 +28,7 @@ class AddEditViewModel @Inject constructor(
     private val repository: ItemRepository,
     private val reminderScheduler: ReminderScheduler,
     private val userPreferences: UserPreferences,
+    private val photoStorage: PhotoStorage,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -40,16 +43,31 @@ class AddEditViewModel @Inject constructor(
 
     val isEditMode: Boolean get() = itemId != 0L
 
+    /**
+     * Initial values of the form, captured on first load. Used to detect whether
+     * the user has unsaved changes before they navigate away.
+     */
+    private var initialSnapshot: AddEditUiState = AddEditUiState()
+
+    val isDirty: StateFlow<Boolean> = _state
+        .map { it != initialSnapshot }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     init {
         if (itemId != 0L) {
             viewModelScope.launch {
                 val existing = repository.get(itemId)
                 if (existing != null) {
-                    _state.value = AddEditUiState.fromItem(existing)
+                    val loaded = AddEditUiState.fromItem(existing)
+                    _state.value = loaded
+                    initialSnapshot = loaded
                 }
             }
         } else if (initialBarcode != null) {
             _state.update { it.copy(barcode = initialBarcode) }
+            initialSnapshot = _state.value
+        } else {
+            initialSnapshot = _state.value
         }
     }
 
@@ -62,7 +80,11 @@ class AddEditViewModel @Inject constructor(
     }
 
     fun removePhoto(uri: String) {
+        // Drop from state, then delete the file. We only delete files we own
+        // (paths under app-internal storage); arbitrary content URIs are left
+        // alone by PhotoStorage.
         _state.update { it.copy(photoPaths = it.photoPaths - uri) }
+        viewModelScope.launch { photoStorage.deleteIfOwned(uri) }
     }
 
     fun save(onDone: (Long) -> Unit) {
@@ -108,10 +130,14 @@ class AddEditViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
+            val paths = repository.photoPathsFor(itemId)
+            paths.forEach { photoStorage.deleteIfOwned(it) }
             repository.delete(itemId)
             onDone()
         }
     }
+
+    fun hasPhotos(): Boolean = _state.value.photoPaths.isNotEmpty()
 
     private suspend fun scheduleRemindersFor(id: Long, item: Item) {
         val warrantyLeadMs = TimeUnit.DAYS.toMillis(

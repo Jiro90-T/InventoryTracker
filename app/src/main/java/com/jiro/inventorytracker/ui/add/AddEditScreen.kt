@@ -1,6 +1,7 @@
 package com.jiro.inventorytracker.ui.add
 
 import android.app.DatePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -41,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -85,11 +89,23 @@ fun AddEditScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val persona by viewModel.persona.collectAsState()
+    val isDirty by viewModel.isDirty.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
     var showPhotoChooser by remember { mutableStateOf(false) }
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // Intercept back navigation when there are unsaved changes.
+    BackHandler(enabled = isDirty) {
+        showDiscardDialog = true
+    }
+
+    val attemptBack: () -> Unit = {
+        if (isDirty) showDiscardDialog = true else onBack()
+    }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -104,8 +120,19 @@ fun AddEditScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         val file = pendingCameraFile
-        if (success && file != null && file.exists() && file.length() > 0) {
-            viewModel.addPhoto(file.absolutePath)
+        when {
+            success && file != null && file.exists() && file.length() > 0 -> {
+                viewModel.addPhoto(file.absolutePath)
+            }
+            success -> {
+                // TakePicture returned true but the file is missing/empty.
+                viewModel.update { it.copy(error = "Photo capture failed. Please try again.") }
+            }
+            else -> {
+                // User cancelled or the camera app failed. Keep the file cleaned up.
+                if (file != null) file.delete()
+                viewModel.update { it.copy(error = "Photo capture was cancelled.") }
+            }
         }
         pendingCameraFile = null
     }
@@ -122,13 +149,13 @@ fun AddEditScreen(
             TopAppBar(
                 title = { Text(if (viewModel.isEditMode) "Edit item" else "Add item") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = attemptBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     if (viewModel.isEditMode) {
-                        IconButton(onClick = { viewModel.delete(onBack) }) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
                         }
                     }
@@ -174,25 +201,19 @@ fun AddEditScreen(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = state.quantity.toString(),
-                    onValueChange = { v ->
-                        val n = v.toIntOrNull() ?: 1
-                        viewModel.update { it.copy(quantity = n.coerceAtLeast(1)) }
-                    },
-                    label = { Text("Qty") },
-                    modifier = Modifier.width(96.dp),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
                 OutlinedTextField(
                     value = state.location,
                     onValueChange = { v -> viewModel.update { it.copy(location = v) } },
                     label = { Text("Location") },
                     modifier = Modifier.weight(1f),
                     singleLine = true
+                )
+                QuantityStepper(
+                    value = state.quantity,
+                    onChange = { n -> viewModel.update { it.copy(quantity = n) } }
                 )
             }
 
@@ -417,6 +438,72 @@ fun AddEditScreen(
             }
         )
     }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved changes that will be lost.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    onBack()
+                }) { Text("Discard") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) { Text("Keep editing") }
+            }
+        )
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete this item?") },
+            text = {
+                if (viewModel.hasPhotos()) {
+                    Text("This will also delete its photos. This action cannot be undone.")
+                } else {
+                    Text("This action cannot be undone.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.delete(onBack)
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuantityStepper(
+    value: Int,
+    onChange: (Int) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedIconButton(
+            onClick = { onChange((value - 1).coerceAtLeast(1)) },
+            enabled = value > 1
+        ) {
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Decrease quantity")
+        }
+        Text(
+            text = value.toString(),
+            modifier = Modifier
+                .width(40.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            style = MaterialTheme.typography.titleMedium
+        )
+        OutlinedIconButton(onClick = { onChange(value + 1) }) {
+            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Increase quantity")
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -550,7 +637,7 @@ private fun PhotoStrip(
                 Box(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
                         model = path,
-                        contentDescription = null,
+                        contentDescription = "Item photo",
                         modifier = Modifier.fillMaxSize()
                     )
                     IconButton(
@@ -559,7 +646,7 @@ private fun PhotoStrip(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Remove",
+                            contentDescription = "Remove photo",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }

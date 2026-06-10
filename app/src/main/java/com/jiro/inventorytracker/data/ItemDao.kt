@@ -48,6 +48,14 @@ interface ItemDao {
     @Query("SELECT COUNT(*) FROM items")
     suspend fun count(): Int
 
+    /**
+     * Flattened list of every photo path currently referenced by an item, used by
+     * the photo-orphan cleanup pass. Returns a list of plain strings (we just want
+     * file paths).
+     */
+    @Query("SELECT photo_paths FROM items")
+    suspend fun allReferencedPhotoPathsRaw(): List<List<String>>
+
     @Query("SELECT * FROM items ORDER BY updated_at DESC")
     suspend fun observeAllOnce(): List<Item>
 

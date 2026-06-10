@@ -2,7 +2,7 @@
 
 A personal inventory manager for **home users and small businesses**. Track your items, snap a photo, scan a barcode, get reminded before warranties and consumables expire.
 
-> Status: **M2 — personas, settings, and data export**. Users pick a mode on first launch (Home / Business / Collector), and the form adapts. Settings cover persona, currency, theme, and reminder lead-time. CSV export uses the system file picker.
+> Status: **M3 — polish & bug fixes**. Orphan photo cleanup, photo delete-on-remove, better camera permission recovery, confirm-before-discard / confirm-before-delete dialogs, test reminder button, proper notification icon, empty-state illustrations, quantity stepper, search clear button.
 
 ---
 
@@ -19,6 +19,8 @@ A personal inventory manager for **home users and small businesses**. Track your
 | Persona modes | **live** | Home / Business / Collector; changes suggested categories and form fields |
 | Settings | **live** | Persona, currency, theme, reminder lead-time, CSV export |
 | CSV export | **live** | Storage Access Framework → user picks destination |
+| Photo lifecycle | **live** | Photos deleted when removed from item; orphan cleanup on app start |
+| Polish | **live** | Confirm-discard, confirm-delete, test reminder, quantity stepper, empty states, a11y labels |
 
 ## Tech stack
 
@@ -40,7 +42,7 @@ app/src/main/java/com/jiro/inventorytracker/
 ├── domain/                    # ItemRepository
 ├── di/                        # Hilt modules
 ├── export/                    # CSV exporter
-├── media/                     # PhotoStorage (file storage + FileProvider)
+├── media/                     # PhotoStorage + PhotoMaintenance (orphan cleanup)
 ├── persona/                   # Persona enum + UserPreferences (DataStore)
 ├── reminders/                 # WorkManager workers + scheduler
 └── ui/
@@ -57,8 +59,9 @@ app/src/main/java/com/jiro/inventorytracker/
 
 - **M1** — ✅ Core flows (barcode, photos, full CRUD, reminders)
 - **M2** — ✅ Personas, settings, CSV export, category filter chips
-- **M3** — Cloud sync (Firebase or Supabase), PDF export, multi-user for small businesses
-- **M4** — Receipt OCR, Wear OS companion, quick-add widget
+- **M3** — ✅ Polish & bug fixes (photo lifecycle, a11y, confirmations, WorkManager init)
+- **M4** — Backup/restore (JSON + photos), then cloud sync
+- **M5** — PDF export, multi-user, receipt OCR, Wear OS
 
 ## Building
 

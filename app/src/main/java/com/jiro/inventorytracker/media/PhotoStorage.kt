@@ -52,4 +52,22 @@ object PhotoStorage {
             "${context.packageName}.fileprovider",
             file
         )
+
+    /**
+     * Deletes the file at [path] if it lives under our photos directory. Safe to
+     * call with paths from outside the dir (no-op). Returns true if a file was
+     * deleted.
+     */
+    fun deleteIfOwned(context: Context, path: String?): Boolean {
+        if (path.isNullOrBlank()) return false
+        val file = File(path)
+        if (!file.exists()) return false
+        val photosRoot = photosDir(context).canonicalFile
+        val target = try { file.canonicalFile } catch (_: Throwable) { return false }
+        if (!target.absolutePath.startsWith(photosRoot.absolutePath)) {
+            // Not one of ours, leave it alone.
+            return false
+        }
+        return try { file.delete() } catch (_: Throwable) { false }
+    }
 }

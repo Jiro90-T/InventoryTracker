@@ -148,6 +148,20 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            HorizontalDivider()
+
+            Section("Notifications") {
+                Button(
+                    onClick = { viewModel.sendTestReminderSoon() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Send test notification (in 10s)") }
+                Text(
+                    "Verifies your notification permissions and channel are working. If nothing appears, check that notifications are enabled for this app in system settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
