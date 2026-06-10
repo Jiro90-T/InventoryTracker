@@ -30,5 +30,8 @@ class ItemRepository @Inject constructor(
         }
     }
 
+    suspend fun observeAllOnce(): List<Item> = itemDao.observeAllOnce()
+    suspend fun allCategories(): List<String> = itemDao.allCategories()
+
     suspend fun delete(id: Long) = itemDao.deleteById(id)
 }

@@ -47,4 +47,15 @@ interface ItemDao {
 
     @Query("SELECT COUNT(*) FROM items")
     suspend fun count(): Int
+
+    @Query("SELECT * FROM items ORDER BY updated_at DESC")
+    suspend fun observeAllOnce(): List<Item>
+
+    @Query("SELECT DISTINCT category FROM items WHERE category IS NOT NULL AND category != '' ORDER BY category")
+    suspend fun allCategories(): List<String>
+
+    @Query("SELECT category, COUNT(*) as cnt FROM items WHERE category IS NOT NULL AND category != '' GROUP BY category ORDER BY cnt DESC")
+    fun categoryCounts(): Flow<List<CategoryCount>>
+
+    data class CategoryCount(val category: String, val cnt: Int)
 }

@@ -2,7 +2,7 @@
 
 A personal inventory manager for **home users and small businesses**. Track your items, snap a photo, scan a barcode, get reminded before warranties and consumables expire.
 
-> Status: **M1 — core flows live**. Barcode scanning, item CRUD with full fields, photo capture/gallery, and reminder scheduling all wired end-to-end.
+> Status: **M2 — personas, settings, and data export**. Users pick a mode on first launch (Home / Business / Collector), and the form adapts. Settings cover persona, currency, theme, and reminder lead-time. CSV export uses the system file picker.
 
 ---
 
@@ -12,10 +12,13 @@ A personal inventory manager for **home users and small businesses**. Track your
 |---|---|---|
 | Barcode scanning | **live** | CameraX preview + ML Kit decoder, de-duped per value |
 | Item photos | **live** | Camera capture or gallery picker, stored in app-internal dir, Coil-rendered |
-| Warranty tracking | **live** | Date picker in form; reminder scheduled 30 days before |
-| Expiry reminders | **live** | Date picker in form; reminder scheduled 7 days before |
-| Search & filtering | **live** | Room `LIKE` query, live as you type |
-| Add/Edit/Delete | **live** | Full form with all fields, photos, dates |
+| Warranty tracking | **live** | Date picker in form; reminder scheduled N days before (configurable) |
+| Expiry reminders | **live** | Date picker in form; reminder scheduled N days before (configurable) |
+| Search & filtering | **live** | Room `LIKE` query + category filter chips with counts |
+| Add/Edit/Delete | **live** | Full form with persona-conditional fields, photos, dates |
+| Persona modes | **live** | Home / Business / Collector; changes suggested categories and form fields |
+| Settings | **live** | Persona, currency, theme, reminder lead-time, CSV export |
+| CSV export | **live** | Storage Access Framework → user picks destination |
 
 ## Tech stack
 
@@ -36,22 +39,26 @@ app/src/main/java/com/jiro/inventorytracker/
 ├── data/                      # Room: Item, ItemDao, AppDatabase
 ├── domain/                    # ItemRepository
 ├── di/                        # Hilt modules
+├── export/                    # CSV exporter
 ├── media/                     # PhotoStorage (file storage + FileProvider)
+├── persona/                   # Persona enum + UserPreferences (DataStore)
 ├── reminders/                 # WorkManager workers + scheduler
 └── ui/
-    ├── theme/                 # Material 3 theme
-    ├── home/                  # Inventory list + search
+    ├── theme/                 # Material 3 theme (driven by UserPreferences)
+    ├── onboarding/            # First-run persona chooser
+    ├── home/                  # Inventory list + search + filter chips
     ├── scan/                  # Barcode camera screen + ML Kit analyzer
-    ├── add/                   # Add/Edit Item form
-    └── detail/                # Item detail view
+    ├── add/                   # Add/Edit Item form (persona-conditional)
+    ├── detail/                # Item detail view
+    └── settings/              # Persona, currency, theme, lead-time, CSV export
 ```
 
 ## Roadmap
 
-- **M1** — ✅ Core flows (barcode, photos, full CRUD, reminders) — done
-- **M2** — Category chips, settings screen (notification preferences, dark mode), item count badges
-- **M3** — Export to CSV/PDF, backup/restore
-- **M4** — Cloud sync (Firebase or Supabase) for small business multi-device use
+- **M1** — ✅ Core flows (barcode, photos, full CRUD, reminders)
+- **M2** — ✅ Personas, settings, CSV export, category filter chips
+- **M3** — Cloud sync (Firebase or Supabase), PDF export, multi-user for small businesses
+- **M4** — Receipt OCR, Wear OS companion, quick-add widget
 
 ## Building
 

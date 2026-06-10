@@ -7,12 +7,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,18 +40,25 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onScanClick: () -> Unit,
     onItemClick: (Long) -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val items by viewModel.items.collectAsState()
     val query by viewModel.query.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val categoryCounts by viewModel.categoryCounts.collectAsState()
+    val persona by viewModel.persona.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Inventory") },
+                title = { Text("Inventory · ${persona.displayName}") },
                 actions = {
                     IconButton(onClick = onScanClick) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan barcode")
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
             )
@@ -75,10 +86,37 @@ fun HomeScreen(
                 placeholder = { Text("Search items, category, location, barcode") }
             )
 
+            if (categoryCounts.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategory == null,
+                            onClick = { viewModel.setCategory(null) },
+                            label = { Text("All") }
+                        )
+                    }
+                    items(categoryCounts, key = { it.category }) { entry ->
+                        FilterChip(
+                            selected = selectedCategory == entry.category,
+                            onClick = {
+                                viewModel.setCategory(
+                                    if (selectedCategory == entry.category) null else entry.category
+                                )
+                            },
+                            label = { Text("${entry.category} · ${entry.cnt}") }
+                        )
+                    }
+                }
+            }
+
             if (items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        "No items yet. Tap + to add your first item.",
+                        if (selectedCategory != null) "No items in this category."
+                        else "No items yet. Tap + to add your first item.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -86,8 +124,7 @@ fun HomeScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(items, key = { it.id }) { item ->
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth(),
                             onClick = { onItemClick(item.id) }
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
@@ -96,14 +133,19 @@ fun HomeScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
-                                item.category?.let {
-                                    Text(it, style = MaterialTheme.typography.bodySmall)
+                                val subtitle = buildString {
+                                    item.category?.let { append(it) }
+                                    if (item.location != null) {
+                                        if (isNotEmpty()) append(" · ")
+                                        append(item.location)
+                                    }
+                                    if (item.barcode != null) {
+                                        if (isNotEmpty()) append(" · ")
+                                        append("Barcode: ${item.barcode}")
+                                    }
                                 }
-                                item.location?.let {
-                                    Text("Location: $it", style = MaterialTheme.typography.bodySmall)
-                                }
-                                item.barcode?.let {
-                                    Text("Barcode: $it", style = MaterialTheme.typography.bodySmall)
+                                if (subtitle.isNotEmpty()) {
+                                    Text(subtitle, style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }

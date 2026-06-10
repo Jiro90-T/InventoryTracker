@@ -5,20 +5,27 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jiro.inventorytracker.data.Item
 import com.jiro.inventorytracker.domain.ItemRepository
+import com.jiro.inventorytracker.persona.Persona
+import com.jiro.inventorytracker.persona.UserPreferences
 import com.jiro.inventorytracker.reminders.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 @HiltViewModel
 class AddEditViewModel @Inject constructor(
     private val repository: ItemRepository,
     private val reminderScheduler: ReminderScheduler,
+    private val userPreferences: UserPreferences,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -27,6 +34,9 @@ class AddEditViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(AddEditUiState())
     val state: StateFlow<AddEditUiState> = _state.asStateFlow()
+
+    val persona: StateFlow<Persona> = userPreferences.persona
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Persona.HOME)
 
     val isEditMode: Boolean get() = itemId != 0L
 
@@ -71,10 +81,20 @@ class AddEditViewModel @Inject constructor(
                 location = s.location.trim().ifBlank { null },
                 purchaseDate = s.purchaseDate,
                 purchasePrice = s.purchasePrice,
+                purchaseCurrency = s.purchaseCurrency.ifBlank { null },
+                currentValue = s.currentValue,
                 warrantyExpiresAt = s.warrantyExpiresAt,
                 expiryDate = s.expiryDate,
                 photoPaths = s.photoPaths,
-                notes = s.notes.trim().ifBlank { null }
+                notes = s.notes.trim().ifBlank { null },
+                condition = s.condition?.name,
+                grade = s.grade.trim().ifBlank { null },
+                era = s.era.trim().ifBlank { null },
+                assignedTo = s.assignedTo.trim().ifBlank { null },
+                assetTag = s.assetTag.trim().ifBlank { null },
+                manufacturer = s.manufacturer.trim().ifBlank { null },
+                model = s.model.trim().ifBlank { null },
+                serialNumber = s.serialNumber.trim().ifBlank { null }
             )
             val id = repository.upsert(item)
             scheduleRemindersFor(id, item)
@@ -93,31 +113,32 @@ class AddEditViewModel @Inject constructor(
         }
     }
 
-    private fun scheduleRemindersFor(id: Long, item: Item) {
+    private suspend fun scheduleRemindersFor(id: Long, item: Item) {
+        val warrantyLeadMs = TimeUnit.DAYS.toMillis(
+            userPreferences.warrantyLeadDays.first().toLong()
+        )
+        val expiryLeadMs = TimeUnit.DAYS.toMillis(
+            userPreferences.expiryLeadDays.first().toLong()
+        )
         item.warrantyExpiresAt?.let { ts ->
             reminderScheduler.schedule(
                 itemId = id,
-                triggerAtMillis = ts - THIRTY_DAYS_MS,
+                triggerAtMillis = ts - warrantyLeadMs,
                 title = "Warranty ending soon",
-                message = "${item.name}'s warranty expires in ~30 days."
+                message = "${item.name}'s warranty expires soon."
             )
         }
         item.expiryDate?.let { ts ->
             reminderScheduler.schedule(
                 itemId = id,
-                triggerAtMillis = ts - SEVEN_DAYS_MS,
+                triggerAtMillis = ts - expiryLeadMs,
                 title = "Item expiring soon",
-                message = "${item.name} expires in ~7 days."
+                message = "${item.name} expires soon."
             )
         }
     }
 
     fun clearError() {
         _state.update { it.copy(error = null) }
-    }
-
-    companion object {
-        private const val THIRTY_DAYS_MS = 30L * 24 * 60 * 60 * 1000
-        private const val SEVEN_DAYS_MS = 7L * 24 * 60 * 60 * 1000
     }
 }

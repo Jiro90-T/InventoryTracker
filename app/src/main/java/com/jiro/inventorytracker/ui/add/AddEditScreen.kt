@@ -29,8 +29,13 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +66,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.jiro.inventorytracker.media.PhotoStorage
+import com.jiro.inventorytracker.persona.Condition
+import com.jiro.inventorytracker.persona.Persona
+import com.jiro.inventorytracker.persona.PersonaCategories
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -76,6 +84,7 @@ fun AddEditScreen(
     viewModel: AddEditViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val persona by viewModel.persona.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -127,9 +136,7 @@ fun AddEditScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.save(onSaved) }
-            ) {
+            FloatingActionButton(onClick = { viewModel.save(onSaved) }) {
                 Icon(Icons.Default.Add, contentDescription = "Save")
             }
         },
@@ -143,6 +150,12 @@ fun AddEditScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text(
+                "Mode: ${persona.displayName}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             OutlinedTextField(
                 value = state.name,
                 onValueChange = { v -> viewModel.update { it.copy(name = v) } },
@@ -151,17 +164,18 @@ fun AddEditScreen(
                 singleLine = true
             )
 
+            // Category with chip suggestions
+            CategoryField(
+                value = state.category,
+                onValueChange = { v -> viewModel.update { it.copy(category = v) } },
+                suggestions = PersonaCategories.forPersona(persona),
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
-                    value = state.category,
-                    onValueChange = { v -> viewModel.update { it.copy(category = v) } },
-                    label = { Text("Category") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
                 OutlinedTextField(
                     value = state.quantity.toString(),
                     onValueChange = { v ->
@@ -172,6 +186,13 @@ fun AddEditScreen(
                     modifier = Modifier.width(96.dp),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                OutlinedTextField(
+                    value = state.location,
+                    onValueChange = { v -> viewModel.update { it.copy(location = v) } },
+                    label = { Text("Location") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
                 )
             }
 
@@ -188,25 +209,118 @@ fun AddEditScreen(
                 }
             )
 
+            // Manufacturer / model / serial — useful for all personas
             OutlinedTextField(
-                value = state.location,
-                onValueChange = { v -> viewModel.update { it.copy(location = v) } },
-                label = { Text("Location (e.g. Kitchen, Office)") },
+                value = state.manufacturer,
+                onValueChange = { v -> viewModel.update { it.copy(manufacturer = v) } },
+                label = { Text("Manufacturer / Brand") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
-
-            OutlinedTextField(
-                value = state.purchasePrice?.toString().orEmpty(),
-                onValueChange = { v ->
-                    val d = v.toDoubleOrNull()
-                    viewModel.update { it.copy(purchasePrice = d) }
-                },
-                label = { Text("Purchase price") },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-            )
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = state.model,
+                    onValueChange = { v -> viewModel.update { it.copy(model = v) } },
+                    label = { Text("Model") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = state.serialNumber,
+                    onValueChange = { v -> viewModel.update { it.copy(serialNumber = v) } },
+                    label = { Text("Serial #") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+            }
+
+            // Persona-specific block
+            when (persona) {
+                Persona.HOME -> Unit // home: nothing extra; warranty/expiry covered below
+                Persona.BUSINESS -> {
+                    OutlinedTextField(
+                        value = state.assetTag,
+                        onValueChange = { v -> viewModel.update { it.copy(assetTag = v) } },
+                        label = { Text("Asset tag / Inventory ID") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = state.assignedTo,
+                        onValueChange = { v -> viewModel.update { it.copy(assignedTo = v) } },
+                        label = { Text("Assigned to (employee / department)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+                Persona.COLLECTOR -> {
+                    ConditionDropdown(
+                        value = state.condition,
+                        onPick = { c -> viewModel.update { it.copy(condition = c) } }
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = state.grade,
+                            onValueChange = { v -> viewModel.update { it.copy(grade = v) } },
+                            label = { Text("Grade (e.g. PSA 10)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = state.era,
+                            onValueChange = { v -> viewModel.update { it.copy(era = v) } },
+                            label = { Text("Era / Year") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+
+            // Money + dates
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = state.purchasePrice?.toString().orEmpty(),
+                    onValueChange = { v ->
+                        val d = v.toDoubleOrNull()
+                        viewModel.update { it.copy(purchasePrice = d) }
+                    },
+                    label = { Text("Purchase price") },
+                    modifier = Modifier.weight(1.5f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+                OutlinedTextField(
+                    value = state.purchaseCurrency,
+                    onValueChange = { v -> viewModel.update { it.copy(purchaseCurrency = v.uppercase().take(3)) } },
+                    label = { Text("Cur") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+            }
+
+            if (persona == Persona.COLLECTOR) {
+                OutlinedTextField(
+                    value = state.currentValue?.toString().orEmpty(),
+                    onValueChange = { v ->
+                        val d = v.toDoubleOrNull()
+                        viewModel.update { it.copy(currentValue = d) }
+                    },
+                    label = { Text("Current estimated value (${state.purchaseCurrency})") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+            }
 
             DateRow(
                 label = "Purchase date",
@@ -215,19 +329,23 @@ fun AddEditScreen(
                 onClear = { viewModel.update { it.copy(purchaseDate = null) } }
             )
 
-            DateRow(
-                label = "Warranty expires",
-                timestamp = state.warrantyExpiresAt,
-                onPick = { ts -> viewModel.update { it.copy(warrantyExpiresAt = ts) } },
-                onClear = { viewModel.update { it.copy(warrantyExpiresAt = null) } }
-            )
+            if (persona == Persona.HOME || persona == Persona.BUSINESS) {
+                DateRow(
+                    label = "Warranty expires",
+                    timestamp = state.warrantyExpiresAt,
+                    onPick = { ts -> viewModel.update { it.copy(warrantyExpiresAt = ts) } },
+                    onClear = { viewModel.update { it.copy(warrantyExpiresAt = null) } }
+                )
+            }
 
-            DateRow(
-                label = "Expiry date",
-                timestamp = state.expiryDate,
-                onPick = { ts -> viewModel.update { it.copy(expiryDate = ts) } },
-                onClear = { viewModel.update { it.copy(expiryDate = null) } }
-            )
+            if (persona == Persona.HOME) {
+                DateRow(
+                    label = "Expiry date",
+                    timestamp = state.expiryDate,
+                    onPick = { ts -> viewModel.update { it.copy(expiryDate = ts) } },
+                    onClear = { viewModel.update { it.copy(expiryDate = null) } }
+                )
+            }
 
             Text(
                 "Photos",
@@ -298,6 +416,72 @@ fun AddEditScreen(
                 TextButton(onClick = { showPhotoChooser = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    suggestions: List<String>,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text("Category") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        if (suggestions.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(suggestions) { s ->
+                    FilterChip(
+                        selected = value.equals(s, ignoreCase = true),
+                        onClick = { onValueChange(s) },
+                        label = { Text(s) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConditionDropdown(
+    value: Condition?,
+    onPick: (Condition?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value = value?.displayName.orEmpty(),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Condition") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("None") },
+                onClick = { onPick(null); expanded = false }
+            )
+            Condition.entries.forEach { c ->
+                DropdownMenuItem(
+                    text = { Text(c.displayName) },
+                    onClick = { onPick(c); expanded = false }
+                )
+            }
+        }
     }
 }
 

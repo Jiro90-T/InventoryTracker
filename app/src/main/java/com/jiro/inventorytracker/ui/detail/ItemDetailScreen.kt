@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.jiro.inventorytracker.persona.Condition
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -110,9 +111,25 @@ fun ItemDetailScreen(
             DetailRow("Barcode", current.barcode)
             DetailRow("Quantity", current.quantity.toString())
             DetailRow("Location", current.location)
+            DetailRow("Manufacturer", current.manufacturer)
+            DetailRow("Model", current.model)
+            DetailRow("Serial number", current.serialNumber)
+
+            // Persona-specific
+            DetailRow("Condition", current.condition?.let { Condition.fromName(it)?.displayName })
+            DetailRow("Grade", current.grade)
+            DetailRow("Era", current.era)
+            DetailRow("Asset tag", current.assetTag)
+            DetailRow("Assigned to", current.assignedTo)
+
+            // Money + dates
             DetailRow(
                 "Purchase price",
-                current.purchasePrice?.let { "%.2f".format(it) }
+                current.purchasePrice?.let { "${"%.2f".format(it)} ${current.purchaseCurrency.orEmpty()}" }
+            )
+            DetailRow(
+                "Current value",
+                current.currentValue?.let { "${"%.2f".format(it)} ${current.purchaseCurrency.orEmpty()}" }
             )
             DetailRow(
                 "Purchase date",
